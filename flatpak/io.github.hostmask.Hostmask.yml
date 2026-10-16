@@ -1,0 +1,42 @@
+app-id: io.github.hostmask.Hostmask
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: hostmask-gui
+finish-args:
+  # Window: X11 through XWayland. Wayland cannot hide a window, which closing to the tray needs.
+  # fallback-x11 would hide X11 whenever Wayland is present, so ask for x11 directly.
+  - --socket=wayland
+  - --socket=x11
+  - --share=ipc
+  - --device=dri
+  # Remote sets are downloaded by URL.
+  - --share=network
+  # Writing /etc/hosts: pkexec runs on the host through flatpak-spawn.
+  - --talk-name=org.freedesktop.Flatpak
+  # Tray icon: StatusNotifierItem over D-Bus (no GTK needed).
+  - --talk-name=org.kde.StatusNotifierWatcher
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/hostmask/cargo
+  # cargo downloads crates during the build. Flathub needs vendored sources instead.
+  build-args:
+    - --share=network
+modules:
+  - name: hostmask
+    buildsystem: simple
+    build-commands:
+      - cargo build --release -p hostmask-gui -p hostmask
+      - install -Dm755 target/release/hostmask-gui /app/bin/hostmask-gui
+      - install -Dm755 target/release/hostmask /app/bin/hostmask
+      - install -Dm644 flatpak/io.github.hostmask.Hostmask.desktop /app/share/applications/io.github.hostmask.Hostmask.desktop
+      - install -Dm644 flatpak/io.github.hostmask.Hostmask.svg /app/share/icons/hicolor/scalable/apps/io.github.hostmask.Hostmask.svg
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - target
+          - dist

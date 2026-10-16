@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Hostmask
+Comment=Hosts-file set manager
+Exec=hostmask-gui
+Icon=io.github.hostmask.Hostmask
+Terminal=false
+Categories=Network;Utility;
+StartupWMClass=Hostmask

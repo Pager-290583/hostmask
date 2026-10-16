@@ -1,0 +1,15 @@
+[package]
+name = "hostmask_core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Core logic for managing named hosts-file sets (GasMask-compatible storage)"
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+ureq = "3.2.1"
+
+[dev-dependencies]
+tempfile = "3.27.0"

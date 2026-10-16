@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/cli", "crates/gui"]
+exclude = ["vendor"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.88"
+
+# ksni 0.3.6 with the Ayatana label (text next to the tray icon). See vendor/ksni/HOSTMASK.md.
+[patch.crates-io]
+ksni = { path = "vendor/ksni" }

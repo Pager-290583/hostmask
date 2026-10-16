@@ -1,0 +1,8 @@
+target/
+*.tmp
+dist/
+.flatpak-builder/
+build-dir/
+*.flatpak
+linux-import/
+docs/memory/
