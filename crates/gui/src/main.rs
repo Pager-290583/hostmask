@@ -33,6 +33,12 @@ fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_title("Hostmask")
+            .with_icon(
+                eframe::icon_data::from_png_bytes(include_bytes!(
+                    "../../../assets/icons/hostmask-256.png"
+                ))
+                .expect("bundled application icon is a valid PNG"),
+            )
             .with_inner_size([980.0, 640.0])
             .with_min_inner_size([680.0, 420.0]),
         // Menu-bar only: no Dock icon and no entry in the app switcher. The bundle's

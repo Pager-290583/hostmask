@@ -1,0 +1,125 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux Flatpak (x86_64)
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v5
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: hostmask.flatpak
+          artifact-name: hostmask-linux
+          manifest-path: flatpak/io.github.hostmask.Hostmask.yml
+          cache-key: flatpak-builder-${{ hashFiles('Cargo.lock', 'flatpak/*.yml') }}
+          arch: x86_64
+
+  macos:
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            arch: arm64
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            arch: x86_64
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: macos-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('**/*.rs') }}
+          restore-keys: |
+            macos-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}-
+      - name: Test
+        run: cargo test --locked --workspace
+      - name: Build application and disk image
+        run: scripts/package-macos.sh '${{ matrix.target }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hostmask-macos-${{ matrix.arch }}
+          path: dist/Hostmask-macos-${{ matrix.arch }}.dmg
+          if-no-files-found: error
+
+  release:
+    name: Publish Linux and macOS
+    needs: [linux, macos]
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: hostmask-*
+          merge-multiple: true
+          path: artifacts
+      - name: Verify release files and write notes
+        run: |
+          cd artifacts
+          test -s hostmask.flatpak
+          test -s Hostmask-macos-arm64.dmg
+          test -s Hostmask-macos-x86_64.dmg
+          sha256sum hostmask.flatpak Hostmask-macos-*.dmg > SHA256SUMS
+          cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          Сборка из коммита $GITHUB_SHA.
+
+          - **Linux x86_64:** скачайте hostmask.flatpak и выполните: flatpak install --user hostmask.flatpak
+          - **Mac с Apple Silicon (M1 и новее):** Hostmask-macos-arm64.dmg.
+          - **Mac с Intel:** Hostmask-macos-x86_64.dmg.
+
+          macOS: откройте DMG и перетащите Hostmask в «Программы». Приложение работает через строку меню, без значка в Dock.
+          Сборки macOS имеют локальную ad-hoc подпись, без нотариализации Apple. При блокировке откройте «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть».
+          Контрольные суммы файлов: SHA256SUMS.
+          EOF
+      - name: Publish rolling or tagged release
+        run: |
+          if [ "$GITHUB_REF" = refs/heads/main ]; then
+            tag=latest
+            title="Latest build (${GITHUB_SHA:0:7})"
+            if gh release view "$tag" >/dev/null 2>&1; then
+              # Keep the release and its download URLs; only move its rolling tag.
+              gh api --method PATCH "repos/$GH_REPO/git/refs/tags/latest" -f sha="$GITHUB_SHA" -F force=true
+              gh release edit "$tag" --title "$title" --notes-file "$RUNNER_TEMP/release-notes.md" --prerelease
+            else
+              gh release create "$tag" --target "$GITHUB_SHA" --title "$title" --notes-file "$RUNNER_TEMP/release-notes.md" --prerelease
+            fi
+          else
+            tag="$GITHUB_REF_NAME"
+            if ! gh release view "$tag" >/dev/null 2>&1; then
+              gh release create "$tag" --verify-tag --title "Hostmask $tag" --notes-file "$RUNNER_TEMP/release-notes.md"
+            fi
+          fi
+          gh release upload "$tag" artifacts/hostmask.flatpak artifacts/Hostmask-macos-*.dmg artifacts/SHA256SUMS --clobber

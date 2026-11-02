@@ -14,24 +14,30 @@ pub enum TrayCmd {
     Quit,
 }
 
-/// A 36×36 globe as an alpha mask (row-major, one byte per pixel).
-/// The macOS template image and the Linux icon are both drawn from this.
-fn globe_alpha() -> Vec<u8> {
+/// Monochrome mask for the macOS template icon. The system supplies its tint.
+#[cfg(not(target_os = "linux"))]
+fn mask_alpha() -> Vec<u8> {
     const SIZE: u32 = 36;
-    let c = (SIZE as f32 - 1.0) / 2.0;
-    let radius = 14.0_f32;
-    let stroke = 2.0_f32;
     let mut alpha = Vec::with_capacity((SIZE * SIZE) as usize);
     for y in 0..SIZE {
         for x in 0..SIZE {
-            let dx = x as f32 - c;
-            let dy = y as f32 - c;
-            let dist = (dx * dx + dy * dy).sqrt();
-            let ring = (dist - radius).abs() <= stroke / 2.0;
-            let meridian = dx.abs() <= stroke / 2.0 && dist <= radius;
-            let equator = dy.abs() <= stroke / 2.0 && dist <= radius;
-            let on = ring || meridian || equator;
-            alpha.push(if on { 255 } else { 0 });
+            // Supersample the silhouette so it remains smooth on Retina displays.
+            let mut coverage = 0_u16;
+            for sy in 0..4 {
+                for sx in 0..4 {
+                    let dx = x as f32 + (sx as f32 + 0.5) / 4.0 - 18.0;
+                    let py = y as f32 + (sy as f32 + 0.5) / 4.0;
+                    let u = dx.abs() / 15.0;
+                    let top = 8.0 + 5.0 * (1.0 - u).powi(4);
+                    let bottom = 27.0 - 7.0 * u.powi(3) - 5.0 * (1.0 - u).powi(12);
+                    let eye = ((dx.abs() - 7.5) / 5.0).powi(2)
+                        + ((py - 17.5) / 3.0).powi(2) < 1.0;
+                    if u <= 1.0 && py >= top && py <= bottom && !eye {
+                        coverage += 1;
+                    }
+                }
+            }
+            alpha.push((coverage * 255 / 16) as u8);
         }
     }
     alpha
@@ -51,7 +57,7 @@ mod native {
     use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
     use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
-    use super::{globe_alpha, TrayCmd};
+    use super::{mask_alpha, TrayCmd};
 
     const ID_SHOW: &str = "show";
     const ID_NEXT: &str = "next";
@@ -148,12 +154,12 @@ mod native {
         }
     }
 
-    /// Black-on-transparent globe. Black with alpha is a macOS "template" image,
+    /// Black-on-transparent mask. Black with alpha is a macOS "template" image,
     /// so the system tints it for light and dark menu bars.
     fn template_icon() -> Icon {
         const SIZE: u32 = 36;
         let mut rgba = Vec::with_capacity((SIZE * SIZE * 4) as usize);
-        for a in globe_alpha() {
+        for a in mask_alpha() {
             rgba.extend_from_slice(&[0, 0, 0, a]);
         }
         Icon::from_rgba(rgba, SIZE, SIZE).expect("icon dimensions match the buffer")
@@ -183,7 +189,7 @@ mod linux {
     use ksni::menu::{CheckmarkItem, MenuItem, StandardItem};
     use ksni::Icon;
 
-    use super::{globe_alpha, TrayCmd};
+    use super::TrayCmd;
 
     const SIZE: i32 = 36;
 
@@ -235,8 +241,12 @@ mod linux {
         }
 
         fn icon_pixmap(&self) -> Vec<Icon> {
-            // SNI expects ARGB32 in network byte order. A white glyph suits dark panels.
-            let data = globe_alpha().into_iter().flat_map(|a| [a, 255, 255, 255]).collect();
+            // SNI expects ARGB32 in network byte order, rather than PNG/RGBA.
+            let icon = eframe::icon_data::from_png_bytes(include_bytes!(
+                "../../../assets/icons/hostmask-36.png"
+            )).expect("bundled tray icon is a valid PNG");
+            let data = icon.rgba.chunks_exact(4)
+                .flat_map(|p| [p[3], p[0], p[1], p[2]]).collect();
             vec![Icon { width: SIZE, height: SIZE, data }]
         }
 
