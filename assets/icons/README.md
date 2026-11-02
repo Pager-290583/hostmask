@@ -4,7 +4,8 @@ Approved artwork: a silver mask and two connected turquoise network nodes on a g
 Generated with the built-in ImageGen tool; original prompt: a macOS Hostmask icon combining a friendly mask and network routing, legible at small sizes, no text.
 
 - `hostmask-source.png`: original approved artwork, with transparency.
-- `hostmask-1024.png`: application / Flatpak icon and source for macOS ICNS sizes.
+- `hostmask-1024.png`: source for macOS ICNS sizes.
+- `hostmask-512.png`: largest Flatpak icon (Flatpak export limits raster icons to 512x512).
 - `hostmask-256.png`: embedded window icon and Flatpak launcher icon.
 - `hostmask-36.png`: Linux and Windows tray icon.
 - `Hostmask.ico`: Windows executable resource (generated from the approved PNG with `sips`).

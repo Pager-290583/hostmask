@@ -35,7 +35,7 @@ modules:
       - install -Dm755 target/release/hostmask /app/bin/hostmask
       - install -Dm644 flatpak/io.github.hostmask.Hostmask.desktop /app/share/applications/io.github.hostmask.Hostmask.desktop
       - install -Dm644 assets/icons/hostmask-256.png /app/share/icons/hicolor/256x256/apps/io.github.hostmask.Hostmask.png
-      - install -Dm644 assets/icons/hostmask-1024.png /app/share/icons/hicolor/1024x1024/apps/io.github.hostmask.Hostmask.png
+      - install -Dm644 assets/icons/hostmask-512.png /app/share/icons/hicolor/512x512/apps/io.github.hostmask.Hostmask.png
     sources:
       - type: dir
         path: ..
