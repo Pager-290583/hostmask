@@ -27,21 +27,133 @@ A hosts-file set manager for macOS, Linux (Flatpak) and Windows. A Rust reimplem
 - Automatic restore of `/etc/hosts` when another program changes it (the app warns instead, so you are not asked for a password on every change).
 - Windows browser DNS/cache shortcut.
 
-## Downloads and installation
+## Установка
 
-Download the files from [Releases](https://github.com/Pager-290583/hostmask/releases/tag/latest).
+Готовые сборки находятся в [GitHub Releases → latest](https://github.com/Pager-290583/hostmask/releases/tag/latest), в блоке **Assets**. Это автоматически обновляемый предварительный релиз. Скачивать исходники и устанавливать Rust для запуска приложения не нужно.
 
-| Platform | File | Installation |
-| --- | --- | --- |
-| macOS, Apple Silicon (M1 and newer) | `Hostmask-macos-arm64.dmg` | Open the disk image and drag Hostmask into Applications. |
-| macOS, Intel | `Hostmask-macos-x86_64.dmg` | Open the disk image and drag Hostmask into Applications. |
-| Linux, x86_64 | `hostmask.flatpak` | `flatpak install --user hostmask.flatpak` |
-| Windows 10/11, x64 | `Hostmask-windows-x86_64.zip` | Extract the ZIP and run `Hostmask.exe`. |
+| Платформа | Файл |
+| --- | --- |
+| macOS, Apple Silicon (M1 и новее) | `Hostmask-macos-arm64.dmg` |
+| macOS, Intel | `Hostmask-macos-x86_64.dmg` |
+| Windows 10/11, x64 | `Hostmask-windows-x86_64.zip` |
+| Linux, x86_64 | `hostmask.flatpak` |
 
-macOS builds are ad-hoc signed, without Apple notarization. If Gatekeeper blocks the first launch, use **System Settings → Privacy & Security → Open Anyway** for Hostmask. The app lives in the menu bar and does not show a Dock icon.
-Linux needs a Flatpak runtime from Flathub; GNOME additionally needs the AppIndicator extension for the tray. See [Fedora instructions](flatpak/BUILD-FEDORA.md).
-Windows is a portable build with the icon embedded in `Hostmask.exe`; no installer is required. It requests administrator permission (UAC) at launch to write the system hosts file. Closing the window keeps it in the system tray. Sets live in `%APPDATA%\hostmask`. The executable has no Windows publisher certificate. The Chrome DNS/cache shortcut is currently unavailable on Windows. See [Windows notes](windows/README.txt).
-Release file checksums are published in `SHA256SUMS`.
+### macOS
+
+1. Откройте меню **Apple → Об этом Mac**. Если указан чип Apple M1/M2/M3/M4/M5 или новее — выбирайте `arm64`; если процессор Intel — `x86_64`.
+2. Скачайте соответствующий `.dmg` из **Assets** релиза.
+3. Откройте образ и перетащите **Hostmask.app** на значок **Applications / Программы** внутри образа.
+4. Запустите **Hostmask** из папки **Программы** в Finder. Затем образ можно извлечь.
+5. Если macOS заблокирует первый запуск, закройте уведомление и откройте **Системные настройки → Конфиденциальность и безопасность → Всё равно открыть** для Hostmask. Подтвердите запуск. Сборка имеет локальную ad-hoc подпись, без нотариализации Apple; [инструкция Apple](https://support.apple.com/ru-ru/102445).
+
+**Где искать приложение:** `/Applications/Hostmask.app`. В Finder папка «Программы» открывается сочетанием **⌘⇧A**. Hostmask работает через значок маски в верхней строке меню и не показывает значок в Dock. Закрытие окна по умолчанию прячет его; вернуть окно можно через значок маски → **Открыть Hostmask**. Для полного завершения выберите **Выйти из Hostmask**.
+
+**Переключение наборов:** при записи системного hosts macOS запросит права администратора. Touch ID используется, если он уже настроен в системе для sudo; иначе появится запрос пароля.
+
+**Обновление:** завершите Hostmask через его меню, скачайте новый DMG и замените приложение в «Программах». Наборы и настройки хранятся отдельно, в `~/Library/Gas Mask/`, поэтому замена приложения их не удаляет.
+
+### Windows
+
+1. Для Windows 10/11 **x64** скачайте `Hostmask-windows-x86_64.zip` из **Assets** релиза.
+2. Нажмите по ZIP правой кнопкой → **Извлечь всё**. Переместите распакованную папку в постоянное место, например в свою папку «Программы». Установщик не нужен.
+3. Откройте распакованную папку и запустите **Hostmask.exe**. Не запускайте приложение непосредственно внутри ZIP.
+4. Подтвердите запрос контроля учётных записей **UAC**. Приложение запрашивает права администратора при запуске, поскольку переключение наборов меняет системный файл `%SystemRoot%\System32\drivers\etc\hosts`.
+5. Если SmartScreen показывает предупреждение о неизвестном издателе, учитывайте, что эта сборка не имеет сертификата подписи Windows. Для файла, скачанного из Releases этого репозитория, разрешение запуска доступно через **Подробнее → Выполнить в любом случае**, если политика компьютера это допускает.
+
+**Где искать приложение:** в папке, куда вы распаковали ZIP. Можно создать ярлык для `Hostmask.exe` на рабочем столе. После закрытия окна Hostmask по умолчанию остаётся в системном трее рядом с часами; значок может находиться под стрелкой **˄**. Нажмите по маске правой кнопкой → **Открыть Hostmask** или **Выйти из Hostmask**.
+
+**Данные:** наборы и настройки находятся в `%APPDATA%\hostmask` учётной записи, от которой запущено приложение. Консольная утилита `hostmask-cli.exe` лежит рядом с GUI; для активации набора из CLI нужен терминал с правами администратора. Пункт открытия Chrome для очистки кэша на Windows пока не реализован — при необходимости перезапустите браузер после смены hosts.
+
+**Обновление:** завершите Hostmask через трей, распакуйте новый ZIP и замените файлы программы. Папку `%APPDATA%\hostmask` удалять не нужно.
+
+### Linux — Flatpak
+
+Пакет предназначен для **x86_64**. Flatpak устанавливается один раз; компилятор Rust и Flatpak SDK для готового пакета не нужны.
+
+**1. Установите Flatpak**, если он ещё не установлен.
+
+Fedora:
+
+```sh
+sudo dnf install flatpak
+```
+
+Ubuntu / Debian:
+
+```sh
+sudo apt update
+sudo apt install flatpak
+```
+
+Для другого дистрибутива используйте [инструкции настройки Flathub](https://flathub.org/en/setup). После первой установки Flatpak выйдите из сеанса и войдите снова, чтобы приложения появились в меню рабочего стола.
+
+**2. Подключите Flathub для текущего пользователя и установите runtime:**
+
+```sh
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user flathub org.freedesktop.Platform//25.08
+```
+
+**3. Скачайте `hostmask.flatpak` из Assets релиза.** Откройте терминал в папке со скачанным файлом и выполните:
+
+```sh
+flatpak install --user ./hostmask.flatpak
+```
+
+Hostmask распространяется через GitHub Releases; в каталоге Flathub его искать не нужно. Flathub здесь используется для системного runtime.
+
+**4. Запустите Hostmask** из меню приложений или командой:
+
+```sh
+flatpak run io.github.hostmask.Hostmask
+```
+
+**5. Настройте трей, если используете GNOME.** Для значка нужно расширение **AppIndicator and KStatusNotifierItem Support**. Пример для Fedora:
+
+```sh
+sudo dnf install gnome-shell-extension-appindicator
+gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com
+```
+
+После установки расширения выйдите из сеанса и войдите снова. В KDE Plasma дополнительное расширение для трея обычно не требуется. Hostmask использует X11/XWayland, чтобы закрытие окна могло прятать его в трей. Если значок трея недоступен, отключите в настройках Hostmask опцию «При закрытии окна оставлять Hostmask в строке меню» — тогда закрытие окна завершит приложение.
+
+**Переключение наборов:** изменение `/etc/hosts` выполняется через `pkexec` и системный запрос прав администратора. На компьютере должны работать polkit и его агент авторизации. Hostmask сбрасывает системный DNS-кэш; браузер может потребовать отдельного сброса кэша или перезапуска.
+
+**Данные:** `~/.var/app/io.github.hostmask.Hostmask/data/hostmask/`.
+
+**Обновление:** завершите приложение через трей, скачайте свежий `hostmask.flatpak`, откройте терминал в папке с файлом и выполните:
+
+```sh
+flatpak install --user --reinstall ./hostmask.flatpak
+```
+
+Инструкции по сборке из исходников и диагностике: [Flatpak на Fedora](flatpak/BUILD-FEDORA.md). Справка по командам: [документация Flatpak](https://docs.flatpak.org/en/latest/using-flatpak.html).
+
+### Первый запуск и проверка загрузки
+
+На новой установке Hostmask сохраняет текущий системный hosts в набор **«Исходный»**. Сам первый запуск не меняет системный файл. Чтобы применить другой набор, выберите его и нажмите **Сделать активным** либо выберите набор в меню трея.
+
+Для проверки скачанного файла возьмите `SHA256SUMS` из того же релиза и сравните указанную в нём сумму с результатом команды для своего файла:
+
+macOS:
+
+```sh
+shasum -a 256 Hostmask-macos-arm64.dmg
+```
+
+Windows PowerShell:
+
+```powershell
+Get-FileHash .\Hostmask-windows-x86_64.zip -Algorithm SHA256
+```
+
+Linux:
+
+```sh
+sha256sum hostmask.flatpak
+```
+
+Для Intel Mac подставьте имя `Hostmask-macos-x86_64.dmg`. Переменная `HOSTMASK_HOME` позволяет использовать другую папку данных на любой платформе.
 
 ## Build
 
