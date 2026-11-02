@@ -15,7 +15,7 @@ pub enum TrayCmd {
 }
 
 /// Monochrome mask for the macOS template icon. The system supplies its tint.
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "macos")]
 fn mask_alpha() -> Vec<u8> {
     const SIZE: u32 = 36;
     let mut alpha = Vec::with_capacity((SIZE * SIZE) as usize);
@@ -57,7 +57,9 @@ mod native {
     use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
     use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
-    use super::{mask_alpha, TrayCmd};
+    #[cfg(target_os = "macos")]
+    use super::mask_alpha;
+    use super::TrayCmd;
 
     const ID_SHOW: &str = "show";
     const ID_NEXT: &str = "next";
@@ -86,8 +88,8 @@ mod native {
 
             let icon = TrayIconBuilder::new()
                 .with_tooltip("Hostmask")
-                .with_icon(template_icon())
-                .with_icon_as_template(true)
+                .with_icon(platform_icon())
+                .with_icon_as_template(cfg!(target_os = "macos"))
                 .build()
                 .map_err(|e| e.to_string())?;
             Ok(Self { icon, rx, state: None })
@@ -113,6 +115,9 @@ mod native {
             self.icon.set_menu(Some(Box::new(build_menu(names, active))));
             // macOS shows this text next to the icon in the menu bar.
             self.icon.set_title(active);
+            let tooltip = active.map(|name| format!("Hostmask: {name}"))
+                .unwrap_or_else(|| "Hostmask".into());
+            let _ = self.icon.set_tooltip(Some(&tooltip));
             self.state = Some(state);
         }
     }
@@ -156,13 +161,23 @@ mod native {
 
     /// Black-on-transparent mask. Black with alpha is a macOS "template" image,
     /// so the system tints it for light and dark menu bars.
-    fn template_icon() -> Icon {
+    #[cfg(target_os = "macos")]
+    fn platform_icon() -> Icon {
         const SIZE: u32 = 36;
         let mut rgba = Vec::with_capacity((SIZE * SIZE * 4) as usize);
         for a in mask_alpha() {
             rgba.extend_from_slice(&[0, 0, 0, a]);
         }
         Icon::from_rgba(rgba, SIZE, SIZE).expect("icon dimensions match the buffer")
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn platform_icon() -> Icon {
+        let icon = eframe::icon_data::from_png_bytes(include_bytes!(
+            "../../../assets/icons/hostmask-36.png"
+        )).expect("bundled tray icon is a valid PNG");
+        Icon::from_rgba(icon.rgba, icon.width, icon.height)
+            .expect("icon dimensions match the buffer")
     }
 
     #[cfg(test)]

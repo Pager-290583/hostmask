@@ -55,6 +55,7 @@ pub fn system_hosts_path() -> PathBuf {
 /// Default data directory. On macOS this is GasMask's own directory, so existing
 /// sets are picked up without copying.
 pub fn default_data_dir() -> PathBuf {
+    #[cfg(not(windows))]
     let home = std::env::var_os("HOME").map(PathBuf::from);
     #[cfg(target_os = "macos")]
     {
@@ -274,10 +275,13 @@ fn install_linux(contents: &str) -> Result<(), PlatformError> {
 
 #[cfg(windows)]
 fn install_from(src: &Path) -> Result<(), PlatformError> {
-    // The process must already be elevated (manifest requireAdministrator or UAC relaunch).
-    // Not yet tested on Windows.
+    // The GUI embeds a requireAdministrator manifest; CLI activation needs an elevated terminal.
+    use std::os::windows::process::CommandExt;
     fs::copy(src, system_hosts_path())?;
-    let _ = Command::new("ipconfig").arg("/flushdns").output();
+    let _ = Command::new("ipconfig")
+        .arg("/flushdns")
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW: do not flash a console over the GUI.
+        .output();
     Ok(())
 }
 

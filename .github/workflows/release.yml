@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   linux:
@@ -60,6 +60,7 @@ jobs:
           key: macos-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('**/*.rs') }}
           restore-keys: |
             macos-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}-
+            macos-${{ matrix.target }}-
       - name: Test
         run: cargo test --locked --workspace
       - name: Build application and disk image
@@ -70,9 +71,54 @@ jobs:
           path: dist/Hostmask-macos-${{ matrix.arch }}.dmg
           if-no-files-found: error
 
+  windows:
+    name: Windows (x86_64)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal; rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-x86_64-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('**/*.rs') }}
+          restore-keys: |
+            windows-x86_64-${{ hashFiles('Cargo.lock') }}-
+      - name: Test
+        run: cargo test --locked --workspace
+      - name: Build portable archive
+        run: ./scripts/package-windows.ps1
+      - name: Verify CLI and GUI startup without changing system hosts
+        shell: pwsh
+        run: |
+          $env:HOSTMASK_HOME = Join-Path $env:RUNNER_TEMP 'hostmask-smoke'
+          $before = (Get-FileHash "$env:SystemRoot/System32/drivers/etc/hosts").Hash
+          $app = Resolve-Path 'dist/Hostmask-windows-x86_64/Hostmask.exe'
+          & 'dist/Hostmask-windows-x86_64/hostmask-cli.exe' list
+          if ($LASTEXITCODE -ne 0) { throw 'CLI smoke check failed' }
+          $process = Start-Process -FilePath $app -PassThru
+          try {
+            if (-not $process.WaitForInputIdle(30000)) { throw 'GUI did not become ready' }
+            $process.Refresh()
+            if ($process.HasExited -or $process.MainWindowHandle -eq 0) { throw 'GUI window was not created' }
+            Write-Host "Hostmask GUI window: $($process.MainWindowTitle)"
+          } finally {
+            if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+          }
+          $after = (Get-FileHash "$env:SystemRoot/System32/drivers/etc/hosts").Hash
+          if ($before -ne $after) { throw 'Smoke check unexpectedly changed system hosts' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hostmask-windows-x86_64
+          path: dist/Hostmask-windows-x86_64.zip
+          if-no-files-found: error
+
   release:
-    name: Publish Linux and macOS
-    needs: [linux, macos]
+    name: Publish Linux, macOS and Windows
+    needs: [linux, macos, windows]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     permissions:
@@ -92,13 +138,15 @@ jobs:
           test -s hostmask.flatpak
           test -s Hostmask-macos-arm64.dmg
           test -s Hostmask-macos-x86_64.dmg
-          sha256sum hostmask.flatpak Hostmask-macos-*.dmg > SHA256SUMS
+          test -s Hostmask-windows-x86_64.zip
+          sha256sum hostmask.flatpak Hostmask-macos-*.dmg Hostmask-windows-x86_64.zip > SHA256SUMS
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
           Сборка из коммита $GITHUB_SHA.
 
           - **Linux x86_64:** скачайте hostmask.flatpak и выполните: flatpak install --user hostmask.flatpak
           - **Mac с Apple Silicon (M1 и новее):** Hostmask-macos-arm64.dmg.
           - **Mac с Intel:** Hostmask-macos-x86_64.dmg.
+          - **Windows 10/11 x64:** Hostmask-windows-x86_64.zip — распакуйте и запустите Hostmask.exe. При запуске потребуется подтверждение UAC для работы с системным hosts. Сборка без сертификата подписи Windows.
 
           macOS: откройте DMG и перетащите Hostmask в «Программы». Приложение работает через строку меню, без значка в Dock.
           Сборки macOS имеют локальную ad-hoc подпись, без нотариализации Apple. При блокировке откройте «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть».
@@ -122,4 +170,4 @@ jobs:
               gh release create "$tag" --verify-tag --title "Hostmask $tag" --notes-file "$RUNNER_TEMP/release-notes.md"
             fi
           fi
-          gh release upload "$tag" artifacts/hostmask.flatpak artifacts/Hostmask-macos-*.dmg artifacts/SHA256SUMS --clobber
+          gh release upload "$tag" artifacts/hostmask.flatpak artifacts/Hostmask-macos-*.dmg artifacts/Hostmask-windows-x86_64.zip artifacts/SHA256SUMS --clobber

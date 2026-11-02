@@ -220,7 +220,7 @@ impl HostmaskApp {
     }
 
     fn refresh_system_text(&mut self) {
-        self.system_text = platform::read_system_hosts().unwrap_or_else(|e| format!("Не удалось прочитать /etc/hosts: {e}"));
+        self.system_text = platform::read_system_hosts().unwrap_or_else(|e| format!("Не удалось прочитать {}: {e}", platform::system_hosts_path().display()));
     }
 
     fn open_dialog(&mut self, dialog: Dialog) {
@@ -328,7 +328,7 @@ impl HostmaskApp {
                             self.show_browser_hint(Some(name.clone()));
                         }
                         Err(PlatformError::Cancelled) => {
-                            self.error("Отменено. /etc/hosts не изменён.");
+                            self.error("Отменено. Системный файл hosts не изменён.");
                         }
                         Err(e) => {
                             self.open_dialog(Dialog::Message {
@@ -484,7 +484,7 @@ impl HostmaskApp {
         let mut clicked: Option<Selection> = None;
         egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui| {
             if ui
-                .selectable_label(self.selection == Selection::System, "/etc/hosts (системный)")
+                .selectable_label(self.selection == Selection::System, "hosts (системный)")
                 .clicked()
             {
                 clicked = Some(Selection::System);
@@ -568,7 +568,7 @@ impl HostmaskApp {
                 });
             }
             Selection::System => {
-                ui.heading("/etc/hosts");
+                ui.heading(platform::system_hosts_path().display().to_string());
                 ui.label(RichText::new("Только просмотр. Чтобы изменить системный файл, активируйте набор.").weak());
                 ui.separator();
                 let mut text = self.system_text.clone();
@@ -640,7 +640,7 @@ impl HostmaskApp {
             ui.horizontal_wrapped(|ui| {
                 ui.colored_label(
                     ui.visuals().warn_fg_color,
-                    format!("⚠ /etc/hosts отличается от активного набора «{active}» (его мог изменить другой программой)."),
+                    format!("⚠ Системный файл hosts отличается от активного набора «{active}» (его могла изменить другая программа)."),
                 );
                 if ui.add_enabled(!busy, Button::new(format!("Применить «{active}»"))).clicked() {
                     self.activate(&active);
@@ -821,7 +821,7 @@ impl HostmaskApp {
                     });
                     ui.label(RichText::new("0 — не обновлять автоматически.").small().weak());
                     ui.add_space(6.0);
-                    ui.checkbox(watch, "Предупреждать, если /etc/hosts изменён другой программой");
+                    ui.checkbox(watch, "Предупреждать, если системный hosts изменён другой программой");
                     ui.checkbox(keep_running, "При закрытии окна оставлять Hostmask в строке меню");
                     footer(ui, &error, |ui| {
                         if ui.button("Сохранить").clicked() {

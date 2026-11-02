@@ -6,7 +6,8 @@ Generated with the built-in ImageGen tool; original prompt: a macOS Hostmask ico
 - `hostmask-source.png`: original approved artwork, with transparency.
 - `hostmask-1024.png`: application / Flatpak icon and source for macOS ICNS sizes.
 - `hostmask-256.png`: embedded window icon and Flatpak launcher icon.
-- `hostmask-36.png`: Linux tray icon.
+- `hostmask-36.png`: Linux and Windows tray icon.
+- `Hostmask.ico`: Windows executable resource (generated from the approved PNG with `sips`).
 
 The macOS menu bar uses a separate monochrome mask in `crates/gui/src/tray.rs`, so macOS can tint it for light and dark backgrounds.
 `scripts/bundle-macos.sh` creates the `.icns` with the native macOS tools `sips` and `iconutil`.
