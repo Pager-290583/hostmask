@@ -1,5 +1,9 @@
 # Hostmask
 
+<p align="center">
+  <img src="assets/icons/hostmask-256.png" alt="Hostmask — hosts-file set manager for macOS and Linux" width="160" height="160">
+</p>
+
 A hosts-file set manager for macOS and Linux (Flatpak). A Rust reimplementation of GasMask 0.8.6, see `docs/REVERSE_ENGINEERING.md`.
 
 ## Features
